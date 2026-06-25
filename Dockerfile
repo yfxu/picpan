@@ -7,7 +7,7 @@ FROM oven/bun:1.3.9-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN bunx prisma generate
+RUN DATABASE_URL=postgresql://dummy:dummy@localhost/dummy bunx prisma generate
 RUN bun run build
 
 FROM node:22-alpine AS runner
