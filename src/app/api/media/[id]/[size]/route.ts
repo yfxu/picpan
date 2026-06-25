@@ -6,7 +6,6 @@ import { createS3Client, getObject } from "../../../../../lib/s3"
 import { decryptBuffer } from "../../../../../lib/media-crypto"
 import { albumAccessCookieName, verifyAlbumAccessCookie } from "../../../../../lib/album-access"
 
-type Size = "small" | "medium" | "original"
 const VALID_SIZES = new Set<string>(["small", "medium", "original"])
 
 export async function GET(
@@ -66,7 +65,7 @@ export async function GET(
   const encrypted = await getObject(s3, instance.s3Bucket, `${media.s3Key}/${size}.enc`)
   const plaintext = decryptBuffer(encrypted, media.encKey, iv)
 
-  return new Response(plaintext, {
+  return new Response(new Uint8Array(plaintext), {
     headers: {
       "Content-Type": "image/jpeg",
       "Cache-Control": isPublicAccess ? "public, max-age=3600" : "private, max-age=3600",
