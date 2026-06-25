@@ -1,0 +1,31 @@
+services:
+  app:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fatu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fatu}
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fatu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-fatu}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fatu}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=20
+
+volumes:
+  postgres_data:

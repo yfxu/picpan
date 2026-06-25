@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  media        Media[]
+  albums       Album[]
+}
+
+model Media {
+  id          String   @id
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  filename    String
+  mimeType    String
+  size        Int
+  s3Key       String
+  encKey      String
+  encIvSmall  String
+  encIvMedium String
+  encIvOrig   String
+  width       Int?
+  height      Int?
+  takenAt     DateTime?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+  contentHash String?
+  albums      AlbumMedia[]
+
+  @@unique([userId, contentHash])
+}
+
+model Album {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  name         String
+  createdAt    DateTime     @default(now())
+  media        AlbumMedia[]
+  isPublic     Boolean      @default(false)
+  passwordHash String?
+}
+
+model AlbumMedia {
+  albumId String
+  mediaId String
+  album   Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media   Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  addedAt DateTime @default(now())
+  @@id([albumId, mediaId])
+}
+
+model Instance {
+  id                 String @id @default("singleton")
+  cdnBaseUrl         String
+  s3Endpoint         String
+  s3Region           String
+  s3Bucket           String
+  s3AccessKey        String
+  s3SecretKey        String
+  s3Provider         String
+  trashRetentionDays Int    @default(90)
+}

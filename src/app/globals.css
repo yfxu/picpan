@@ -1,0 +1,53 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* Show gradient overlay on hover in normal mode only */
+.album-card {
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+.album-card:hover {
+  opacity: 0.85;
+}
+
+.photo-wrapper:hover .photo-overlay {
+  opacity: 1 !important;
+}
+
+/* Show selection circle on hover, in select mode, or when photo is selected */
+.photo-wrapper:hover .photo-select-circle,
+.select-mode .photo-select-circle,
+.photo-selected .photo-select-circle {
+  opacity: 1 !important;
+}
+
+/* Default circle background (no inline style when unselected) */
+.photo-select-circle {
+  background-color: rgba(0,0,0,0.25);
+}
+
+/* Checkmark hidden by default; CSS controls color so hover can affect it */
+.photo-select-circle svg {
+  color: transparent;
+  transition: color 150ms;
+}
+
+/* Gray checkmark on hover (white circle) */
+.select-mode:not(.photo-selected):hover .photo-select-circle svg {
+  color: rgba(0,0,0,0.4);
+}
+
+/* White checkmark when selected */
+.photo-selected .photo-select-circle svg {
+  color: #fff;
+}
+
+/* White fill on circle hover in select mode */
+.select-mode:not(.photo-selected):hover .photo-select-circle {
+  background-color: #fff;
+}
