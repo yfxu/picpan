@@ -12,7 +12,7 @@ export default async function PublicAlbumPage({ params }: { params: Promise<{ id
     where: { id },
     include: {
       media: {
-        orderBy: { media: { takenAt: { sort: "desc", nulls: "last" } } },
+        orderBy: { media: { takenAt: { sort: "asc", nulls: "last" } } },
         select: { media: { select: { id: true, width: true, height: true } } },
       },
     },

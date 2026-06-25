@@ -206,7 +206,6 @@ export default function AppShell({ username, storageBytes, children }: Props) {
         layout="mix"
         navTheme={mode === "dark" ? "realDark" : "light"}
         fixedHeader
-        fixedSider
         collapsedButtonRender={false}
         route={route}
         location={{ pathname }}
