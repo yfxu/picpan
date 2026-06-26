@@ -30,7 +30,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules
 # Copy the whole @prisma scope so the CLI's transitive deps (@prisma/debug,
 # @prisma/get-platform, @prisma/fetch-engine, ...) come along — the Next.js
 # standalone trace only includes the client's deps, not the CLI's.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+# Invoke the real entry (prisma/build/index.js) from entrypoint.sh rather than
+# the .bin/prisma symlink — COPY dereferences the symlink into .bin/, which
+# breaks the CLI's relative lookup of its *.wasm assets.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
