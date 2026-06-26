@@ -26,10 +26,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Sharp native binaries are not reliably included in the standalone trace
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 
-# Prisma CLI + engines needed to run `migrate deploy` at startup
+# Prisma CLI + engines needed to run `migrate deploy` at startup.
+# Copy the whole @prisma scope so the CLI's transitive deps (@prisma/debug,
+# @prisma/get-platform, @prisma/fetch-engine, ...) come along — the Next.js
+# standalone trace only includes the client's deps, not the CLI's.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 COPY --chown=nextjs:nodejs entrypoint.sh ./
