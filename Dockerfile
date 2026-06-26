@@ -35,8 +35,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Uncomment when a public/ directory exists:
 # COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Prisma schema + migrations, needed by `migrate deploy` at startup
+# Prisma schema + migrations + config (prisma.config.ts supplies datasource.url
+# for `migrate deploy` in Prisma 7), needed at startup
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 
 COPY --chown=nextjs:nodejs entrypoint.sh ./
 RUN chmod +x entrypoint.sh
