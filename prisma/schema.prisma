@@ -40,6 +40,8 @@ model Media {
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
   contentHash String?
+  cdnPublic   Boolean   @default(false)
+  cdnToken    String?
   albums      AlbumMedia[]
 
   @@unique([userId, contentHash])
@@ -66,7 +68,7 @@ model AlbumMedia {
 }
 
 model Instance {
-  id                 String @id @default("singleton")
+  id                 String  @id @default("singleton")
   cdnBaseUrl         String
   s3Endpoint         String
   s3Region           String
@@ -74,5 +76,12 @@ model Instance {
   s3AccessKey        String
   s3SecretKey        String
   s3Provider         String
-  trashRetentionDays Int    @default(90)
+  trashRetentionDays Int     @default(90)
+  s3PublicBucket     String?
+  cdnPublicBaseUrl   String?
+  s3PublicEndpoint   String?
+  s3PublicRegion     String?
+  s3PublicAccessKey  String?
+  s3PublicSecretKey  String?
+  s3PublicProvider   String?
 }

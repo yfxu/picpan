@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "../../../lib/auth"
 import { prisma } from "../../../lib/prisma"
-import { createS3Client, deleteObject } from "../../../lib/s3"
+import { createS3Client, createPublicS3Client, deleteObject } from "../../../lib/s3"
+import { cdnConfigured } from "../../../lib/media-cdn"
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -35,7 +36,7 @@ export async function DELETE(request: Request) {
       userId: session.user.id,
       deletedAt: force ? { not: null } : { lte: cutoff },
     },
-    select: { id: true, s3Key: true },
+    select: { id: true, s3Key: true, cdnPublic: true, cdnToken: true },
   })
 
   if (items.length === 0) return NextResponse.json({ deleted: 0 })
@@ -48,6 +49,22 @@ export async function DELETE(request: Request) {
       deleteObject(s3, instance.s3Bucket, `${item.s3Key}/original.enc`),
     ])
   )
+
+  // Defensive: clean up any still-public plaintext derivatives (normally already
+  // removed at trash time). The public bucket is on its own provider/creds.
+  if (cdnConfigured(instance)) {
+    const publicBucket = instance.s3PublicBucket!
+    const publicS3 = createPublicS3Client(instance)
+    await Promise.allSettled(
+      items
+        .filter((item) => item.cdnPublic && item.cdnToken)
+        .flatMap((item) => [
+          deleteObject(publicS3, publicBucket, `${item.cdnToken}/small.jpg`),
+          deleteObject(publicS3, publicBucket, `${item.cdnToken}/medium.jpg`),
+          deleteObject(publicS3, publicBucket, `${item.cdnToken}/original.jpg`),
+        ])
+    )
+  }
 
   await prisma.media.deleteMany({ where: { id: { in: items.map((i) => i.id) } } })
 

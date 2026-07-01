@@ -13,6 +13,7 @@ interface SelectionContextValue {
   currentAlbumId: string | null
   setCurrentAlbumId: (id: string | null) => void
   removeFromAlbum: () => Promise<void>
+  setCdnForSelected: (action: "publish" | "unpublish") => Promise<{ ok: boolean; error?: string }>
 }
 
 const SelectionContext = createContext<SelectionContextValue>({
@@ -26,6 +27,7 @@ const SelectionContext = createContext<SelectionContextValue>({
   currentAlbumId: null,
   setCurrentAlbumId: () => {},
   removeFromAlbum: async () => {},
+  setCdnForSelected: async () => ({ ok: false }),
 })
 
 export function useSelection() {
@@ -75,6 +77,23 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     router.refresh()
   }, [currentAlbumId, selected, router])
 
+  // Idempotent on the server: already-public photos are skipped on publish, and
+  // non-public photos are skipped on unpublish.
+  const setCdnForSelected = useCallback(async (action: "publish" | "unpublish") => {
+    const res = await fetch("/api/media/cdn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mediaIds: [...selected], action }),
+    })
+    if (res.ok) {
+      setSelected(new Set())
+      router.refresh()
+      return { ok: true }
+    }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, error: data.error as string | undefined }
+  }, [selected, router])
+
   return (
     <SelectionContext.Provider value={{
       selected,
@@ -87,6 +106,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       currentAlbumId,
       setCurrentAlbumId,
       removeFromAlbum,
+      setCdnForSelected,
     }}>
       {children}
     </SelectionContext.Provider>

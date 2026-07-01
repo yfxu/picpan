@@ -133,10 +133,48 @@ Unpublished albums return 403 for unauthenticated requests.
 - Algorithm: AES-256-GCM
 - Key: derived server-side from `ENCRYPTION_SECRET` env var
 - IV: randomly generated per file, prepended to the ciphertext blob before S3 upload
-- Decryption happens in the API layer when serving files directly (non-CDN path)
-- CDN path serves encrypted blobs — suitable only if the CDN is trusted (Cloudflare)
+- Decryption happens in the API layer when serving files directly (the default, private path)
+- The private bucket only ever holds encrypted `.enc` blobs; a CDN is never pointed at it
 
-Note: if direct CDN serving of encrypted blobs is undesirable, the alternative is to generate pre-signed S3 URLs routed through the server for decryption. This is a config option to consider post-alpha.
+---
+
+## Public CDN serving
+
+Encryption-at-rest protects *private* content. Photos the user deliberately publishes for embedding on a public website are, by definition, not secret — so for exactly those photos we generate a **plaintext derivative** and serve it straight from a CDN, with the app out of the request path.
+
+### Model
+
+- Per-photo only. `Media.cdnPublic` (bool) is the single source of truth. There is intentionally **no** album-level CDN flag — one source of truth avoids photos becoming public via a path the user didn't expect.
+- Photos are marked individually or via multi-select. Operations are idempotent: publishing an already-public photo is a no-op, and unpublishing a non-public photo is a no-op.
+
+### Storage
+
+A **separate public bucket** (`Instance.s3PublicBucket`) holds the plaintext copies and is configured for public read. It has its **own independent provider connection** — `s3PublicEndpoint`, `s3PublicRegion`, `s3PublicAccessKey`, `s3PublicSecretKey`, `s3PublicProvider` — so the public bucket can live on a different host from the private one (e.g. Wasabi private, Cloudflare R2 public). The credentials should be scoped to only the public bucket, so a leak of the public-serving key can never reach the encrypted private bucket. It is fronted by its own CDN hostname (`Instance.cdnPublicBaseUrl`). The private encrypted bucket is never exposed.
+
+The app builds two S3 clients: `createS3Client` (private, reads encrypted originals) and `createPublicS3Client` (public, writes/deletes plaintext derivatives). `cdnConfigured` requires all public-provider fields to be present before publishing is allowed.
+
+On publish, all three sizes are decrypted and written as plaintext JPEGs under a random per-photo token:
+
+```
+{cdnToken}/small.jpg
+{cdnToken}/medium.jpg
+{cdnToken}/original.jpg
+```
+
+Public URL: `{cdnPublicBaseUrl}/{cdnToken}/{size}.jpg`. The token (`Media.cdnToken`) is random and rotates on every publish, so a given URL's bytes never change — objects are written with `Cache-Control: public, max-age=31536000, immutable`. The token also acts as revocation: unpublish deletes the objects and clears the token, so a previously-shared URL dies.
+
+Unpublish is also triggered automatically when a photo is trashed.
+
+### Operator setup (DNS / origin)
+
+Per-instance, one-time, surfaced in Server Configuration:
+
+1. Create the public bucket on the public provider and enable public read on it.
+2. Create an access key scoped to only that bucket, and enter its endpoint/region/keys in Server Configuration.
+3. Put a CDN/proxy (e.g. Cloudflare) in front of the public bucket's S3 endpoint as origin.
+4. Point a DNS record for the CDN hostname at the CDN, and set that hostname as `cdnPublicBaseUrl`.
+
+Note: `ACL: public-read` is set on uploaded objects for providers that honour it (AWS/B2/Wasabi/MinIO). R2 rejects the ACL param with `NotImplemented`, so it is omitted when `s3PublicProvider` is R2 (detected in `providerUsesAcl`); R2 instead relies on bucket-level public access + a custom domain, which the operator setup above covers.
 
 ---
 

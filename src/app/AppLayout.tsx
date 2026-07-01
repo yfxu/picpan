@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SelectionProvider>
-      <AppShell username={session.user.name ?? "User"} storageBytes={storageBytes}>
+      <AppShell username={session.user.name ?? "User"} isAdmin={session.user.role === "ADMIN"} storageBytes={storageBytes}>
         {children}
       </AppShell>
     </SelectionProvider>

@@ -23,7 +23,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
         where: { media: { deletedAt: null } },
         orderBy: { media: { takenAt: { sort: "desc", nulls: "last" } } },
         select: {
-          media: { select: { id: true, width: true, height: true } },
+          media: { select: { id: true, width: true, height: true, cdnPublic: true, cdnToken: true } },
         },
       },
     },
@@ -46,7 +46,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
         isPublic={album.isPublic}
         hasPassword={album.passwordHash !== null}
       />
-      <PhotoGrid photos={photos} albumId={id} />
+      <PhotoGrid photos={photos} albumId={id} cdnPublicBaseUrl={instance.cdnPublicBaseUrl} />
     </AppLayout>
   )
 }

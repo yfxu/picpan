@@ -8,6 +8,8 @@ import {
   AppstoreOutlined,
   CheckCircleFilled,
   CloseOutlined,
+  CloudOutlined,
+  CloudServerOutlined,
   CloudUploadOutlined,
   DeleteOutlined,
   FolderAddOutlined,
@@ -20,7 +22,9 @@ import {
   PlusOutlined,
   SettingOutlined,
   SunOutlined,
+  TeamOutlined,
   UploadOutlined,
+  UserOutlined,
 } from "@ant-design/icons"
 import { signOut } from "next-auth/react"
 import { useThemeMode } from "./providers"
@@ -29,6 +33,7 @@ import AddToAlbumModal from "./AddToAlbumModal"
 
 interface Props {
   username: string
+  isAdmin: boolean
   storageBytes: number
   children: React.ReactNode
 }
@@ -40,23 +45,25 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`
 }
 
-const route = {
-  path: "/",
-  routes: [
-    { path: "/", name: "Photos", icon: <PictureOutlined /> },
-    { path: "/albums", name: "Albums", icon: <AppstoreOutlined /> },
-    { path: "/trash", name: "Trash", icon: <DeleteOutlined /> },
-    { path: "/settings", name: "Server Configuration", icon: <SettingOutlined /> },
-  ],
-}
-
-export default function AppShell({ username, storageBytes, children }: Props) {
+export default function AppShell({ username, isAdmin, storageBytes, children }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const { token } = theme.useToken()
   const { notification, message } = App.useApp()
   const { mode, toggle } = useThemeMode()
-  const { selected, selectMode, clearSelection, albumTargets, setAlbumTargets, deleteSelected, currentAlbumId, removeFromAlbum } = useSelection()
+  const { selected, selectMode, clearSelection, albumTargets, setAlbumTargets, deleteSelected, currentAlbumId, removeFromAlbum, setCdnForSelected } = useSelection()
+
+  const route = {
+    path: "/",
+    routes: [
+      { path: "/", name: "Photos", icon: <PictureOutlined /> },
+      { path: "/albums", name: "Albums", icon: <AppstoreOutlined /> },
+      { path: "/trash", name: "Trash", icon: <DeleteOutlined /> },
+      { path: "/account", name: "Account", icon: <UserOutlined /> },
+      ...(isAdmin ? [{ path: "/users", name: "Users", icon: <TeamOutlined /> }] : []),
+      { path: "/settings", name: "Server Configuration", icon: <SettingOutlined /> },
+    ],
+  }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -165,6 +172,22 @@ export default function AppShell({ username, storageBytes, children }: Props) {
     }
   }
 
+  const [cdnLoading, setCdnLoading] = useState(false)
+
+  async function handleSetCdn(action: "publish" | "unpublish") {
+    setCdnLoading(true)
+    try {
+      const result = await setCdnForSelected(action)
+      if (result.ok) {
+        message.success(action === "publish" ? "Selected photos published to CDN" : "Selected photos removed from CDN")
+      } else {
+        message.error(result.error ?? "Operation failed")
+      }
+    } finally {
+      setCdnLoading(false)
+    }
+  }
+
   const [albumModalOpen, setAlbumModalOpen] = useState(false)
   const [albumName, setAlbumName] = useState("")
   const [albumLoading, setAlbumLoading] = useState(false)
@@ -237,6 +260,12 @@ export default function AppShell({ username, storageBytes, children }: Props) {
                   Remove from Album
                 </Button>
               )}
+              <Button icon={<CloudServerOutlined />} onClick={() => handleSetCdn("publish")} loading={cdnLoading} disabled={cdnLoading}>
+                Make public on CDN
+              </Button>
+              <Button icon={<CloudOutlined />} onClick={() => handleSetCdn("unpublish")} loading={cdnLoading} disabled={cdnLoading}>
+                Remove from CDN
+              </Button>
               <Button danger icon={<DeleteOutlined />} onClick={handleDeleteSelected} loading={deleting} disabled={deleting}>
                 Delete
               </Button>
@@ -299,6 +328,12 @@ export default function AppShell({ username, storageBytes, children }: Props) {
             <Dropdown
               menu={{
                 items: [
+                  {
+                    key: "account",
+                    icon: <UserOutlined />,
+                    label: "Account",
+                    onClick: () => router.push("/account"),
+                  },
                   {
                     key: "logout",
                     icon: <LogoutOutlined />,

@@ -31,7 +31,10 @@ export async function GET(
   if (!media || media.deletedAt) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   let authorized = false
-  let isPublicAccess = false
+  // Only true for passwordless public albums — these are safe for a shared CDN
+  // to cache and serve to anyone. Password-protected access is gated by a cookie
+  // and must never be shared-cached, or it would leak to clients without the cookie.
+  let isPubliclyCacheable = false
 
   if (session && (media.userId === session.user.id || session.user.role === "ADMIN")) {
     authorized = true
@@ -40,12 +43,11 @@ export async function GET(
     if (publicAlbum) {
       if (!publicAlbum.passwordHash) {
         authorized = true
-        isPublicAccess = true
+        isPubliclyCacheable = true
       } else {
         const cookieValue = request.cookies.get(albumAccessCookieName(publicAlbum.id))?.value
         if (verifyAlbumAccessCookie(publicAlbum.id, publicAlbum.passwordHash, cookieValue)) {
           authorized = true
-          isPublicAccess = true
         }
       }
     }
@@ -68,7 +70,7 @@ export async function GET(
   return new Response(new Uint8Array(plaintext), {
     headers: {
       "Content-Type": "image/jpeg",
-      "Cache-Control": isPublicAccess ? "public, max-age=3600" : "private, max-age=3600",
+      "Cache-Control": isPubliclyCacheable ? "public, max-age=3600" : "private, max-age=3600",
     },
   })
 }

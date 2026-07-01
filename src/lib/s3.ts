@@ -13,6 +13,30 @@ export function createS3Client(instance: Instance): S3Client {
   })
 }
 
+// The public bucket has its own provider/credentials, fully independent of the
+// private bucket (e.g. Wasabi private, Cloudflare R2 public). The public-serving
+// key is scoped to only the public bucket so a leak can never reach the encrypted
+// private bucket. Callers must ensure cdnConfigured(instance) is true first —
+// these fields are non-null whenever the CDN is configured.
+export function createPublicS3Client(instance: Instance): S3Client {
+  return new S3Client({
+    region: instance.s3PublicRegion!,
+    endpoint: instance.s3PublicEndpoint!,
+    credentials: {
+      accessKeyId: instance.s3PublicAccessKey!,
+      secretAccessKey: instance.s3PublicSecretKey!,
+    },
+    forcePathStyle: true,
+  })
+}
+
+// R2 rejects object ACLs with NotImplemented; it serves public objects via
+// bucket-level public access + a custom domain instead. Every other supported
+// provider (AWS/B2/Wasabi/MinIO) honours ACL "public-read".
+export function providerUsesAcl(provider: string | null | undefined): boolean {
+  return !/r2/i.test(provider ?? "")
+}
+
 export async function getObject(
   client: S3Client,
   bucket: string,
@@ -54,6 +78,31 @@ export async function putObject(
       Key: key,
       Body: body,
       ContentType: "application/octet-stream",
+    })
+  )
+}
+
+// Writes a publicly-readable, long-cacheable object. Used for plaintext CDN
+// derivatives. ACL "public-read" works on AWS/B2/Wasabi/MinIO; R2 rejects the
+// ACL param with NotImplemented, so it must be omitted there (see
+// providerUsesAcl) and the bucket exposed via public access + a custom domain.
+export async function putPublicObject(
+  client: S3Client,
+  bucket: string,
+  key: string,
+  body: Buffer,
+  contentType: string,
+  cacheControl: string,
+  useAcl: boolean
+): Promise<void> {
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      CacheControl: cacheControl,
+      ...(useAcl ? { ACL: "public-read" as const } : {}),
     })
   )
 }

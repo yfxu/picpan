@@ -4,6 +4,7 @@ import { authOptions } from "../../lib/auth"
 import { prisma } from "../../lib/prisma"
 import { Card, Descriptions } from "antd"
 import AppLayout from "../AppLayout"
+import PublicCdnSettings from "./PublicCdnSettings"
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions)
@@ -11,6 +12,8 @@ export default async function SettingsPage() {
 
   const instance = await prisma.instance.findFirst()
   if (!instance) redirect("/setup")
+
+  const isAdmin = session.user.role === "ADMIN"
 
   return (
     <AppLayout>
@@ -24,6 +27,16 @@ export default async function SettingsPage() {
           <Descriptions.Item label="Trash retention">{instance.trashRetentionDays} days</Descriptions.Item>
         </Descriptions>
       </Card>
+      <PublicCdnSettings
+        s3PublicBucket={instance.s3PublicBucket}
+        cdnPublicBaseUrl={instance.cdnPublicBaseUrl}
+        s3PublicEndpoint={instance.s3PublicEndpoint}
+        s3PublicRegion={instance.s3PublicRegion}
+        s3PublicProvider={instance.s3PublicProvider}
+        s3PublicAccessKey={instance.s3PublicAccessKey}
+        s3PublicSecretKeySet={Boolean(instance.s3PublicSecretKey)}
+        editable={isAdmin}
+      />
     </AppLayout>
   )
 }

@@ -1,12 +1,15 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Dropdown, theme } from "antd"
+import { App, Button, Dropdown, theme } from "antd"
 import {
   CheckOutlined,
+  CloudOutlined,
+  CloudServerOutlined,
   DeleteOutlined,
   EllipsisOutlined,
   FolderAddOutlined,
+  LinkOutlined,
   MinusCircleOutlined,
 } from "@ant-design/icons"
 import { RowsPhotoAlbum } from "react-photo-album"
@@ -16,13 +19,15 @@ import "yet-another-react-lightbox/styles.css"
 import { useSelection } from "./SelectionContext"
 
 interface Props {
-  photos: Array<{ id: string; width: number | null; height: number | null }>
+  photos: Array<{ id: string; width: number | null; height: number | null; cdnPublic: boolean; cdnToken: string | null }>
   albumId?: string
+  cdnPublicBaseUrl?: string | null
 }
 
-export default function PhotoGrid({ photos, albumId }: Props) {
+export default function PhotoGrid({ photos, albumId, cdnPublicBaseUrl }: Props) {
   const router = useRouter()
   const { token } = theme.useToken()
+  const { message } = App.useApp()
   const { selected, selectMode, toggleSelect, clearSelection, setAlbumTargets, setCurrentAlbumId } = useSelection()
   const [index, setIndex] = useState(-1)
 
@@ -51,6 +56,30 @@ export default function PhotoGrid({ photos, albumId }: Props) {
     })
     router.refresh()
   }
+
+  async function handleSetCdn(mediaId: string, action: "publish" | "unpublish") {
+    const res = await fetch("/api/media/cdn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mediaIds: [mediaId], action }),
+    })
+    if (res.ok) {
+      message.success(action === "publish" ? "Photo published to CDN" : "Photo removed from CDN")
+      router.refresh()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      message.error(data.error ?? "Operation failed")
+    }
+  }
+
+  async function handleCopyCdnLink(cdnToken: string, size: "small" | "medium" | "original") {
+    if (!cdnPublicBaseUrl) return
+    const base = cdnPublicBaseUrl.replace(/\/+$/, "")
+    await navigator.clipboard.writeText(`${base}/${cdnToken}/${size}.jpg`)
+    message.success(`${size[0].toUpperCase()}${size.slice(1)} CDN link copied`)
+  }
+
+  const photoById = new Map(photos.map((p) => [p.id, p]))
 
   if (photos.length === 0) {
     return (
@@ -85,6 +114,9 @@ export default function PhotoGrid({ photos, albumId }: Props) {
             photo: ({ onClick }, { photo, width, height }) => {
               const isSelected = selected.has(photo.id)
 
+              const data = photoById.get(photo.id)
+              const isCdnPublic = data?.cdnPublic ?? false
+
               const menuItems = [
                 {
                   key: "add-to-album",
@@ -97,6 +129,41 @@ export default function PhotoGrid({ photos, albumId }: Props) {
                   label: "Remove from Album",
                   icon: <MinusCircleOutlined />,
                   onClick: () => handleRemoveFromAlbum(photo.id),
+                }] : []),
+                isCdnPublic
+                  ? {
+                      key: "cdn-remove",
+                      label: "Remove from CDN",
+                      icon: <CloudOutlined />,
+                      onClick: () => handleSetCdn(photo.id, "unpublish"),
+                    }
+                  : {
+                      key: "cdn-publish",
+                      label: "Make public on CDN",
+                      icon: <CloudServerOutlined />,
+                      onClick: () => handleSetCdn(photo.id, "publish"),
+                    },
+                ...(isCdnPublic && data?.cdnToken ? [{
+                  key: "cdn-copy",
+                  label: "Copy CDN link",
+                  icon: <LinkOutlined />,
+                  children: [
+                    {
+                      key: "cdn-copy-original",
+                      label: "Original",
+                      onClick: () => handleCopyCdnLink(data.cdnToken!, "original"),
+                    },
+                    {
+                      key: "cdn-copy-medium",
+                      label: "Medium",
+                      onClick: () => handleCopyCdnLink(data.cdnToken!, "medium"),
+                    },
+                    {
+                      key: "cdn-copy-small",
+                      label: "Small",
+                      onClick: () => handleCopyCdnLink(data.cdnToken!, "small"),
+                    },
+                  ],
                 }] : []),
                 {
                   key: "delete",
@@ -141,6 +208,29 @@ export default function PhotoGrid({ photos, albumId }: Props) {
                       pointerEvents: "none",
                       zIndex: 2,
                     }} />
+                  )}
+
+                  {isCdnPublic && !selectMode && (
+                    <div
+                      title="Public on CDN"
+                      style={{
+                        position: "absolute",
+                        top: 6,
+                        right: 6,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2,
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <CloudOutlined style={{ fontSize: 12 }} />
+                    </div>
                   )}
 
                   <div

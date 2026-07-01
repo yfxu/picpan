@@ -15,12 +15,12 @@ export default async function PhotosPage() {
   const photos = await prisma.media.findMany({
     where: { userId: session.user.id, deletedAt: null },
     orderBy: [{ takenAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
-    select: { id: true, width: true, height: true },
+    select: { id: true, width: true, height: true, cdnPublic: true, cdnToken: true },
   })
 
   return (
     <AppLayout>
-      <PhotoGrid photos={photos} />
+      <PhotoGrid photos={photos} cdnPublicBaseUrl={instance.cdnPublicBaseUrl} />
     </AppLayout>
   )
 }
